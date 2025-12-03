@@ -50,29 +50,59 @@ serve(async (req) => {
         messages: [
           {
             role: "system",
-            content: `You are an expert OCR system specialized in extracting math questions from documents.
-            
-Your task:
-1. Extract ALL math questions from the provided image
-2. Return them as a JSON array with this exact format:
+            content: `You are an expert OCR system specialized in extracting math questions from exam papers and worksheets.
+
+Your task: Extract ALL math questions from the provided document image(s) with EXTREME precision.
+
+Return a JSON array with this exact format:
 [
-  {"number": 1, "text": "Full question text here including any mathematical expressions"},
-  {"number": 2, "text": "Second question..."}
+  {"number": "1a", "text": "Full question text here"},
+  {"number": "1b", "text": "Next sub-question..."},
+  {"number": "2", "text": "Question 2..."}
 ]
 
-Important rules:
-- Preserve mathematical notation as clearly as possible (use standard notation like x^2 for powers, sqrt() for roots, etc.)
-- Include ALL parts of multi-part questions
-- Number questions sequentially starting from 1
-- If no math questions are found, return an empty array []
-- ONLY return valid JSON, no other text or explanation`
+CRITICAL RULES FOR ACCURACY:
+
+1. QUESTION NUMBERING:
+   - Use the EXACT numbering from the document (e.g., "1", "1a", "1b", "2i", "2ii", "3(i)", "3(ii)")
+   - Each sub-question (a, b, c OR i, ii, iii OR (i), (ii), (iii)) MUST be a SEPARATE entry
+   - DO NOT combine sub-questions into one entry
+   - DO NOT include the question number inside the question text
+
+2. MATHEMATICAL NOTATION - BE EXTREMELY CAREFUL:
+   - Powers: Use ^ notation (e.g., x^2, 10^5, y^(-3))
+   - Fractions: Use / notation (e.g., 3/4, x/y)
+   - Square roots: sqrt(x)
+   - Negative numbers: Preserve negative signs EXACTLY (e.g., -6, not 6)
+   - Inequalities: Use exact symbols (<=, >=, <, >, ≤, ≥)
+   - Vectors: Use column notation like (x, y) or describe as "vector with components x and y"
+   - Exponents: Double-check the exact value (10^5 is NOT the same as 10^7)
+
+3. TABLES, CHARTS, FIGURES, AND DIAGRAMS:
+   - If a question references a table, chart, graph, or diagram, include "[See figure in original document]" at the START of the question
+   - Describe the key data from tables in the question text (e.g., "The table shows: Row 1: Male, Europe: 8, Africa: 5...")
+   - For bar charts/graphs, describe the visible values
+
+4. TEXT ACCURACY:
+   - Copy text EXACTLY as written - do not paraphrase
+   - Preserve all given information (measurements, values, names)
+   - Include any context provided before the actual question
+
+5. COMMON ERRORS TO AVOID:
+   - Do NOT change negative numbers to positive
+   - Do NOT change exponent values
+   - Do NOT merge separate sub-questions
+   - Do NOT include question numbers in the question text itself
+   - Do NOT skip questions with images/diagrams - describe what's needed instead
+
+ONLY return valid JSON, no other text or markdown.`
           },
           {
             role: "user",
             content: [
               {
                 type: "text",
-                text: "Extract all math questions from this document image. Return ONLY a JSON array."
+                text: "Extract all math questions from this document. Each sub-question (a/b/c or i/ii/iii) must be separate. Be EXTREMELY careful with negative signs, exponents, and inequality symbols. Return ONLY a JSON array."
               },
               {
                 type: "image_url",

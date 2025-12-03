@@ -210,7 +210,7 @@ export const DocumentUpload = ({ onUploadComplete }: DocumentUploadProps) => {
           </div>
 
           {uploadStatus === "idle" && (
-            <Button variant="outline" size="sm" className="mt-2" disabled={isUploading}>
+            <Button variant="outline" size="sm" className="mt-2 pointer-events-none" tabIndex={-1}>
               Select File
             </Button>
           )}
