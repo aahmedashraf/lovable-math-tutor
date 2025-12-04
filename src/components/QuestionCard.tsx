@@ -3,40 +3,25 @@ import { ChevronRight, CheckCircle, XCircle, Lightbulb, Loader2, Send } from "lu
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
-import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-
-interface Question {
-  id: string;
-  question_number: string;
-  question_text: string;
-}
-
-interface StudentAnswer {
-  id: string;
-  student_answer: string;
-  is_correct: boolean | null;
-  feedback: string | null;
-}
+import { markAnswer } from "@/lib/api";
+import { Question } from "@/types/question";
 
 interface QuestionCardProps {
   question: Question;
-  existingAnswer?: StudentAnswer;
+  questionIndex: number;
   onAnswerSubmit: () => void;
 }
 
-export const QuestionCard = ({ question, existingAnswer, onAnswerSubmit }: QuestionCardProps) => {
-  const [answer, setAnswer] = useState(existingAnswer?.student_answer || "");
+export const QuestionCard = ({ question, questionIndex, onAnswerSubmit }: QuestionCardProps) => {
+  const [answer, setAnswer] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isGettingHint, setIsGettingHint] = useState(false);
-  const [hints, setHints] = useState<string[]>([]);
-  const [showHints, setShowHints] = useState(false);
   const [currentResult, setCurrentResult] = useState<{
     isCorrect: boolean | null;
     feedback: string | null;
   }>({
-    isCorrect: existingAnswer?.is_correct ?? null,
-    feedback: existingAnswer?.feedback ?? null,
+    isCorrect: null,
+    feedback: null,
   });
   const { toast } = useToast();
 
@@ -52,45 +37,17 @@ export const QuestionCard = ({ question, existingAnswer, onAnswerSubmit }: Quest
 
     setIsSubmitting(true);
     try {
-      // Insert the student answer
-      const { data: answerData, error: answerError } = await supabase
-        .from("student_answers")
-        .insert({
-          question_id: question.id,
-          student_answer: answer.trim(),
-        })
-        .select()
-        .single();
-
-      if (answerError) throw answerError;
-
-      // Call evaluation function
-      const { data: evalData, error: evalError } = await supabase.functions.invoke(
-        "evaluate-answer",
-        {
-          body: {
-            questionId: question.id,
-            questionText: question.question_text,
-            studentAnswer: answer.trim(),
-            answerId: answerData.id,
-          },
-        }
-      );
-
-      if (evalError) {
-        console.error("Evaluation error:", evalError);
-        throw new Error(evalError.message || "Failed to evaluate answer");
-      }
+      const result = await markAnswer(question.question_id, answer.trim());
 
       setCurrentResult({
-        isCorrect: evalData.isCorrect,
-        feedback: evalData.feedback,
+        isCorrect: result.correct,
+        feedback: result.feedback,
       });
 
       toast({
-        title: evalData.isCorrect ? "Correct! 🎉" : "Not quite right",
-        description: evalData.feedback,
-        variant: evalData.isCorrect ? "default" : "destructive",
+        title: result.correct ? "Correct! 🎉" : "Not quite right",
+        description: result.feedback,
+        variant: result.correct ? "default" : "destructive",
       });
 
       onAnswerSubmit();
@@ -106,41 +63,8 @@ export const QuestionCard = ({ question, existingAnswer, onAnswerSubmit }: Quest
     }
   };
 
-  const handleGetHint = async () => {
-    setIsGettingHint(true);
-    try {
-      const { data, error } = await supabase.functions.invoke("get-hint", {
-        body: {
-          questionText: question.question_text,
-          previousHints: hints,
-        },
-      });
-
-      if (error) {
-        console.error("Hint error:", error);
-        throw new Error(error.message || "Failed to get hint");
-      }
-
-      setHints((prev) => [...prev, data.hint]);
-      setShowHints(true);
-      
-      toast({
-        title: "Hint received!",
-        description: "Check out your new hint below.",
-      });
-    } catch (error) {
-      console.error("Hint error:", error);
-      toast({
-        title: "Failed to get hint",
-        description: error instanceof Error ? error.message : "Something went wrong.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsGettingHint(false);
-    }
-  };
-
   const hasSubmitted = currentResult.isCorrect !== null;
+  const questionNumber = questionIndex + 1;
 
   return (
     <Card className="overflow-hidden transition-all duration-300 hover:shadow-card-hover">
@@ -148,9 +72,9 @@ export const QuestionCard = ({ question, existingAnswer, onAnswerSubmit }: Quest
       <div className="bg-secondary/50 px-6 py-4 border-b border-border">
         <div className="flex items-center gap-3">
           <span className="flex items-center justify-center w-8 h-8 rounded-full bg-primary text-primary-foreground text-sm font-semibold">
-            {question.question_number}
+            {questionNumber}
           </span>
-          <h3 className="font-medium text-foreground">Question {question.question_number}</h3>
+          <h3 className="font-medium text-foreground">Question {questionNumber}</h3>
           {hasSubmitted && (
             <span className={`ml-auto flex items-center gap-1 text-sm font-medium ${currentResult.isCorrect ? "text-success" : "text-destructive"}`}>
               {currentResult.isCorrect ? (
@@ -173,28 +97,25 @@ export const QuestionCard = ({ question, existingAnswer, onAnswerSubmit }: Quest
       <div className="p-6">
         <div className="prose prose-sm max-w-none mb-6">
           <p className="text-foreground whitespace-pre-wrap font-mono text-base leading-relaxed">
-            {question.question_text}
+            {question.text}
           </p>
         </div>
 
-        {/* Hints Section */}
-        {hints.length > 0 && showHints && (
-          <div className="mb-6 space-y-3">
-            <button 
-              onClick={() => setShowHints(!showHints)}
-              className="flex items-center gap-2 text-sm font-medium text-warning hover:text-warning/80 transition-colors"
-            >
-              <Lightbulb className="h-4 w-4" />
-              {hints.length} Hint{hints.length > 1 ? "s" : ""} Available
-              <ChevronRight className={`h-4 w-4 transition-transform ${showHints ? "rotate-90" : ""}`} />
-            </button>
-            <div className="space-y-2 pl-6">
-              {hints.map((hint, index) => (
+        {/* Diagrams Section */}
+        {question.diagrams && question.diagrams.length > 0 && (
+          <div className="mb-6 space-y-4">
+            <p className="text-sm font-medium text-muted-foreground">Figures/Diagrams:</p>
+            <div className="grid gap-4 sm:grid-cols-2">
+              {question.diagrams.map((diagram, index) => (
                 <div 
                   key={index}
-                  className="p-3 bg-warning/10 border border-warning/20 rounded-lg text-sm text-foreground animate-fade-in"
+                  className="border border-border rounded-lg overflow-hidden bg-muted/30 p-2"
                 >
-                  <span className="font-medium text-warning">Hint {index + 1}:</span> {hint}
+                  <img
+                    src={diagram.startsWith("data:") ? diagram : `data:image/png;base64,${diagram}`}
+                    alt={`Diagram ${index + 1} for question ${questionNumber}`}
+                    className="w-full h-auto rounded"
+                  />
                 </div>
               ))}
             </div>
@@ -241,25 +162,6 @@ export const QuestionCard = ({ question, existingAnswer, onAnswerSubmit }: Quest
                 <>
                   <Send className="h-4 w-4" />
                   Submit Answer
-                </>
-              )}
-            </Button>
-
-            <Button
-              variant="warning"
-              onClick={handleGetHint}
-              disabled={isGettingHint}
-              className="flex-1 sm:flex-none"
-            >
-              {isGettingHint ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  Thinking...
-                </>
-              ) : (
-                <>
-                  <Lightbulb className="h-4 w-4" />
-                  Get Hint
                 </>
               )}
             </Button>
