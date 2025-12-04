@@ -136,7 +136,7 @@ ONLY return valid JSON, no other text or markdown.`
     console.log("OCR response:", extractedText);
 
     // Parse the extracted questions
-    let questions: Array<{ number: number; text: string }> = [];
+    let questions: Array<{ number: string; text: string }> = [];
     try {
       // Clean up the response - remove markdown code blocks if present
       let cleanedText = extractedText.trim();

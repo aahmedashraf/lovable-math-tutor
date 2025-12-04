@@ -8,7 +8,7 @@ import { useToast } from "@/hooks/use-toast";
 
 interface Question {
   id: string;
-  question_number: number;
+  question_number: string;
   question_text: string;
 }
 
