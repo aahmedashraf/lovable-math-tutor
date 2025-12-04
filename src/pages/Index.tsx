@@ -3,22 +3,24 @@ import { BookOpen, Upload, FileQuestion, Brain, Lightbulb, CheckCircle } from "l
 import { Button } from "@/components/ui/button";
 import { DocumentUpload } from "@/components/DocumentUpload";
 import { QuestionsList } from "@/components/QuestionsList";
+import { Question } from "@/types/question";
 
 type View = "home" | "upload" | "questions";
 
 const Index = () => {
   const [currentView, setCurrentView] = useState<View>("home");
+  const [questions, setQuestions] = useState<Question[]>([]);
 
   const features = [
     {
       icon: Upload,
       title: "Upload Documents",
-      description: "Upload images or PDFs containing math questions",
+      description: "Upload PDFs containing math questions",
     },
     {
       icon: Brain,
       title: "AI-Powered OCR",
-      description: "Automatically extract questions using advanced AI",
+      description: "Automatically extract questions and diagrams using advanced AI",
     },
     {
       icon: CheckCircle,
@@ -31,6 +33,11 @@ const Index = () => {
       description: "Receive helpful hints without spoiling the answer",
     },
   ];
+
+  const handleUploadComplete = (extractedQuestions: Question[]) => {
+    setQuestions(extractedQuestions);
+    setCurrentView("questions");
+  };
 
   if (currentView === "upload") {
     return (
@@ -45,22 +52,24 @@ const Index = () => {
               Upload Your Document
             </h1>
             <p className="text-muted-foreground max-w-lg mx-auto">
-              Upload an image or PDF containing math questions. Our AI will extract and organize them for you.
+              Upload a PDF containing math questions. Our AI will extract questions and diagrams for you.
             </p>
           </header>
 
           {/* Upload Component */}
-          <DocumentUpload onUploadComplete={() => setCurrentView("questions")} />
+          <DocumentUpload onUploadComplete={handleUploadComplete} />
 
           {/* Navigation */}
           <div className="flex justify-center gap-4 mt-8">
             <Button variant="ghost" onClick={() => setCurrentView("home")}>
               Back to Home
             </Button>
-            <Button variant="outline" onClick={() => setCurrentView("questions")}>
-              <FileQuestion className="h-4 w-4" />
-              View Questions
-            </Button>
+            {questions.length > 0 && (
+              <Button variant="outline" onClick={() => setCurrentView("questions")}>
+                <FileQuestion className="h-4 w-4" />
+                View Questions ({questions.length})
+              </Button>
+            )}
           </div>
         </div>
       </main>
@@ -80,12 +89,12 @@ const Index = () => {
               Math Questions
             </h1>
             <p className="text-muted-foreground max-w-lg mx-auto">
-              Answer the questions below. Use the hint feature if you get stuck!
+              Answer the questions below. Diagrams and figures are displayed inline.
             </p>
           </header>
 
           {/* Questions List */}
-          <QuestionsList onBack={() => setCurrentView("upload")} />
+          <QuestionsList questions={questions} onBack={() => setCurrentView("upload")} />
         </div>
       </main>
     );
@@ -108,7 +117,7 @@ const Index = () => {
             </h1>
             
             <p className="text-xl text-muted-foreground max-w-2xl mx-auto leading-relaxed">
-              Upload your math worksheets, get questions extracted automatically, 
+              Upload your math worksheets, get questions and diagrams extracted automatically, 
               and receive instant AI-powered feedback on your answers.
             </p>
 
@@ -121,14 +130,16 @@ const Index = () => {
                 <Upload className="h-5 w-5" />
                 Upload Document
               </Button>
-              <Button 
-                variant="outline" 
-                size="lg" 
-                onClick={() => setCurrentView("questions")}
-              >
-                <FileQuestion className="h-5 w-5" />
-                View Questions
-              </Button>
+              {questions.length > 0 && (
+                <Button 
+                  variant="outline" 
+                  size="lg" 
+                  onClick={() => setCurrentView("questions")}
+                >
+                  <FileQuestion className="h-5 w-5" />
+                  View Questions ({questions.length})
+                </Button>
+              )}
             </div>
           </div>
         </div>
@@ -172,7 +183,7 @@ const Index = () => {
               Ready to Practice?
             </h2>
             <p className="text-muted-foreground mb-8 max-w-lg mx-auto">
-              Start by uploading a document with math questions. Our AI will help you every step of the way.
+              Start by uploading a PDF with math questions. Our AI will help you every step of the way.
             </p>
             <Button 
               variant="hero" 
