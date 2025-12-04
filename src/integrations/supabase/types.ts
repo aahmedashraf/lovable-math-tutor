@@ -16,18 +16,21 @@ export type Database = {
     Tables: {
       documents: {
         Row: {
+          file_url: string | null
           filename: string
           id: string
           status: string
           uploaded_at: string
         }
         Insert: {
+          file_url?: string | null
           filename: string
           id?: string
           status?: string
           uploaded_at?: string
         }
         Update: {
+          file_url?: string | null
           filename?: string
           id?: string
           status?: string
@@ -42,6 +45,7 @@ export type Database = {
           id: string
           question_number: string
           question_text: string
+          sort_order: number | null
         }
         Insert: {
           created_at?: string
@@ -49,6 +53,7 @@ export type Database = {
           id?: string
           question_number: string
           question_text: string
+          sort_order?: number | null
         }
         Update: {
           created_at?: string
@@ -56,6 +61,7 @@ export type Database = {
           id?: string
           question_number?: string
           question_text?: string
+          sort_order?: number | null
         }
         Relationships: [
           {

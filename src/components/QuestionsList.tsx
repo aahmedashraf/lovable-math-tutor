@@ -1,8 +1,9 @@
 import { useState, useEffect } from "react";
-import { FileQuestion, Loader2, ArrowLeft, RefreshCw } from "lucide-react";
+import { FileQuestion, Loader2, ArrowLeft, RefreshCw, Image, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { QuestionCard } from "@/components/QuestionCard";
 import { supabase } from "@/integrations/supabase/client";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 interface Question {
   id: string;
@@ -16,6 +17,7 @@ interface Document {
   filename: string;
   uploaded_at: string;
   status: string;
+  file_url: string | null;
 }
 
 interface QuestionsListProps {
@@ -27,6 +29,7 @@ export const QuestionsList = ({ onBack }: QuestionsListProps) => {
   const [selectedDocumentId, setSelectedDocumentId] = useState<string | null>(null);
   const [questions, setQuestions] = useState<Question[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [showDocumentViewer, setShowDocumentViewer] = useState(false);
 
   const fetchDocuments = async () => {
     setIsLoading(true);
@@ -57,7 +60,7 @@ export const QuestionsList = ({ onBack }: QuestionsListProps) => {
         .from("questions")
         .select("*")
         .eq("document_id", documentId)
-        .order("question_number", { ascending: true });
+        .order("sort_order", { ascending: true });
 
       if (error) throw error;
       setQuestions(data || []);
@@ -65,6 +68,8 @@ export const QuestionsList = ({ onBack }: QuestionsListProps) => {
       console.error("Error fetching questions:", error);
     }
   };
+
+  const selectedDocument = documents.find(d => d.id === selectedDocumentId);
 
   useEffect(() => {
     fetchDocuments();
@@ -133,16 +138,29 @@ export const QuestionsList = ({ onBack }: QuestionsListProps) => {
           </select>
         </div>
 
-        <Button variant="outline" size="icon" onClick={fetchDocuments}>
-          <RefreshCw className="h-4 w-4" />
-        </Button>
+        <div className="flex gap-2">
+          {selectedDocument?.file_url && (
+            <Button variant="outline" onClick={() => setShowDocumentViewer(true)}>
+              <Image className="h-4 w-4" />
+              View Original
+            </Button>
+          )}
+          <Button variant="outline" size="icon" onClick={fetchDocuments}>
+            <RefreshCw className="h-4 w-4" />
+          </Button>
+        </div>
       </div>
 
       {/* Questions Summary */}
-      <div className="bg-secondary/50 rounded-xl p-4">
+      <div className="bg-secondary/50 rounded-xl p-4 flex items-center justify-between">
         <p className="text-sm text-muted-foreground">
           <span className="font-semibold text-foreground">{questions.length}</span> question{questions.length !== 1 ? "s" : ""} extracted from this document
         </p>
+        {selectedDocument?.file_url && (
+          <p className="text-xs text-muted-foreground">
+            Click "View Original" to see figures, tables, and diagrams
+          </p>
+        )}
       </div>
 
       {/* Questions List */}
@@ -155,6 +173,34 @@ export const QuestionsList = ({ onBack }: QuestionsListProps) => {
           />
         ))}
       </div>
+
+      {/* Document Viewer Dialog */}
+      <Dialog open={showDocumentViewer} onOpenChange={setShowDocumentViewer}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="flex items-center justify-between">
+              <span>{selectedDocument?.filename}</span>
+            </DialogTitle>
+          </DialogHeader>
+          <div className="flex-1 overflow-auto bg-muted/30 rounded-lg p-2">
+            {selectedDocument?.file_url && (
+              selectedDocument.file_url.toLowerCase().endsWith('.pdf') ? (
+                <iframe
+                  src={selectedDocument.file_url}
+                  className="w-full h-[70vh] rounded-lg"
+                  title="Original Document"
+                />
+              ) : (
+                <img
+                  src={selectedDocument.file_url}
+                  alt="Original Document"
+                  className="w-full h-auto rounded-lg"
+                />
+              )
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

@@ -156,12 +156,13 @@ ONLY return valid JSON, no other text or markdown.`
 
     console.log(`Extracted ${questions.length} questions`);
 
-    // Insert questions into database
+    // Insert questions into database with sort_order
     if (questions.length > 0) {
-      const questionRows = questions.map((q) => ({
+      const questionRows = questions.map((q, index) => ({
         document_id: documentId,
         question_number: q.number,
         question_text: q.text,
+        sort_order: index + 1,
       }));
 
       const { error: insertError } = await supabase
@@ -174,10 +175,10 @@ ONLY return valid JSON, no other text or markdown.`
       }
     }
 
-    // Update document status to completed
+    // Update document status and store file URL
     const { error: updateError } = await supabase
       .from("documents")
-      .update({ status: "completed" })
+      .update({ status: "completed", file_url: fileUrl })
       .eq("id", documentId);
 
     if (updateError) {
