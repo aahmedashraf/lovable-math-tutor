@@ -1,6 +1,6 @@
 import { Question, GradingResult } from "@/types/question";
 
-const API_BASE_URL = "http://127.0.0.1:8000";
+const API_BASE_URL = "https://sheepish-arla-unalleviatedly.ngrok-free.dev";
 
 export async function uploadPdf(file: File): Promise<Question[]> {
   const formData = new FormData();
