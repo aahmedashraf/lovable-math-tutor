@@ -6,7 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 
 interface Question {
   id: string;
-  question_number: number;
+  question_number: string;
   question_text: string;
   document_id: string;
 }
