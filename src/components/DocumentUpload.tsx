@@ -2,12 +2,11 @@ import { useState, useCallback } from "react";
 import { Upload, FileText, Loader2, CheckCircle, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { uploadPdf } from "@/lib/api";
-import { Question } from "@/types/question";
 
 interface DocumentUploadProps {
-  onUploadComplete: (questions: Question[]) => void;
+  onUploadComplete: () => void;
 }
 
 export const DocumentUpload = ({ onUploadComplete }: DocumentUploadProps) => {
@@ -44,11 +43,12 @@ export const DocumentUpload = ({ onUploadComplete }: DocumentUploadProps) => {
   };
 
   const processFile = async (file: File) => {
-    // Validate file type (PDF only for the custom backend)
-    if (file.type !== "application/pdf") {
+    // Validate file type (images and PDFs)
+    const validTypes = ["image/png", "image/jpeg", "image/jpg", "image/webp", "application/pdf"];
+    if (!validTypes.includes(file.type)) {
       toast({
         title: "Invalid file type",
-        description: "Please upload a PDF file.",
+        description: "Please upload an image (PNG, JPG, WEBP) or PDF file.",
         variant: "destructive",
       });
       return;
@@ -69,18 +69,55 @@ export const DocumentUpload = ({ onUploadComplete }: DocumentUploadProps) => {
     setIsUploading(true);
 
     try {
+      // Create document record
+      const { data: docData, error: docError } = await supabase
+        .from("documents")
+        .insert({ filename: file.name, status: "processing" })
+        .select()
+        .single();
+
+      if (docError) throw docError;
+
+      // Upload file to storage
+      const filePath = `${docData.id}/${file.name}`;
+      const { error: uploadError } = await supabase.storage
+        .from("documents")
+        .upload(filePath, file);
+
+      if (uploadError) throw uploadError;
+
+      // Get public URL
+      const { data: urlData } = supabase.storage
+        .from("documents")
+        .getPublicUrl(filePath);
+
       setUploadStatus("processing");
 
-      const questions = await uploadPdf(file);
+      // Call OCR processing function
+      const { data: processData, error: processError } = await supabase.functions.invoke(
+        "process-document",
+        {
+          body: {
+            documentId: docData.id,
+            fileUrl: urlData.publicUrl,
+            filename: file.name,
+          },
+        }
+      );
+
+      if (processError) {
+        console.error("Processing error:", processError);
+        throw new Error(processError.message || "Failed to process document");
+      }
 
       setUploadStatus("complete");
       toast({
         title: "Document processed!",
-        description: `Successfully extracted ${questions.length} questions.`,
+        description: `Successfully extracted ${processData?.questionsCount || 0} questions.`,
       });
 
       setTimeout(() => {
-        onUploadComplete(questions);
+        onUploadComplete();
       }, 1500);
     } catch (error) {
       console.error("Upload error:", error);
@@ -120,7 +157,7 @@ export const DocumentUpload = ({ onUploadComplete }: DocumentUploadProps) => {
       case "error":
         return "Failed to process document";
       default:
-        return "Drop your PDF here or click to browse";
+        return "Drop your document here or click to browse";
     }
   };
 
@@ -140,7 +177,7 @@ export const DocumentUpload = ({ onUploadComplete }: DocumentUploadProps) => {
         <input
           type="file"
           className="hidden"
-          accept=".pdf,application/pdf"
+          accept="image/*,.pdf"
           onChange={handleFileSelect}
           disabled={isUploading}
         />
@@ -161,7 +198,7 @@ export const DocumentUpload = ({ onUploadComplete }: DocumentUploadProps) => {
             </p>
             {uploadStatus === "idle" && (
               <p className="text-sm text-muted-foreground mt-1">
-                Supports PDF files (max 10MB)
+                Supports PNG, JPG, WEBP, and PDF files (max 10MB)
               </p>
             )}
             {selectedFile && uploadStatus !== "idle" && (
