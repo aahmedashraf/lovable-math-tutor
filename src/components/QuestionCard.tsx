@@ -106,18 +106,21 @@ export const QuestionCard = ({ question, questionIndex, onAnswerSubmit }: Questi
           <div className="mb-6 space-y-4">
             <p className="text-sm font-medium text-muted-foreground">Figures/Diagrams:</p>
             <div className="grid gap-4 sm:grid-cols-2">
-              {question.diagrams.map((diagram, index) => (
-                <div 
-                  key={index}
-                  className="border border-border rounded-lg overflow-hidden bg-muted/30 p-2"
-                >
-                  <img
-                    src={diagram.startsWith("data:") ? diagram : `data:image/png;base64,${diagram}`}
-                    alt={`Diagram ${index + 1} for question ${questionNumber}`}
-                    className="w-full h-auto rounded"
-                  />
-                </div>
-              ))}
+              {question.diagrams.map((diagram, index) => {
+                if (!diagram?.image_base64) return null;
+                return (
+                  <div 
+                    key={index}
+                    className="border border-border rounded-lg overflow-hidden bg-muted/30 p-2"
+                  >
+                    <img
+                      src={`data:image/png;base64,${diagram.image_base64}`}
+                      alt={`Diagram ${index + 1} for question ${questionNumber}`}
+                      className="w-full h-auto rounded"
+                    />
+                  </div>
+                );
+              })}
             </div>
           </div>
         )}
