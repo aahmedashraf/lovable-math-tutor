@@ -12,7 +12,7 @@ serve(async (req) => {
   }
 
   try {
-    const { questionId, questionText, studentAnswer, answerId } = await req.json();
+    const { questionId, questionText, studentAnswer, answerId, documentUrl } = await req.json();
     console.log(`Evaluating answer for question: ${questionId}`);
 
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
@@ -24,19 +24,19 @@ serve(async (req) => {
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // Use LLM to evaluate the answer
-    const evaluationResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
-        messages: [
-          {
-            role: "system",
-            content: `You are an expert math teacher evaluating student answers. 
+    // Check if question references figures/charts/tables
+    const hasFigure = questionText.toLowerCase().includes("[see figure") || 
+                      questionText.toLowerCase().includes("figure") ||
+                      questionText.toLowerCase().includes("chart") ||
+                      questionText.toLowerCase().includes("graph") ||
+                      questionText.toLowerCase().includes("diagram") ||
+                      questionText.toLowerCase().includes("table");
+
+    // Build messages for AI - use multimodal if we have a document with figures
+    const messages: any[] = [
+      {
+        role: "system",
+        content: `You are an expert math teacher evaluating student answers. 
 
 Your task:
 1. Determine if the student's answer is CORRECT or INCORRECT
@@ -47,22 +47,61 @@ Rules:
 - If incorrect, give a hint about where they went wrong
 - Do NOT give away the answer
 - Keep feedback to 1-2 sentences max
+- If the question references a figure, chart, graph, or table, and you can see the document, use that visual information to evaluate the answer
 
 Respond in this exact JSON format:
 {
   "isCorrect": true or false,
   "feedback": "Your brief feedback here"
 }`
+      }
+    ];
+
+    // If there's a document with figures, use multimodal approach
+    if (hasFigure && documentUrl) {
+      console.log("Using multimodal evaluation with document:", documentUrl);
+      messages.push({
+        role: "user",
+        content: [
+          {
+            type: "text",
+            text: `Question: ${questionText}
+
+Student's Answer: ${studentAnswer}
+
+The question may reference a figure, chart, or table from the document. Please look at the attached document to understand the visual context when evaluating the answer.
+
+Evaluate this answer and respond with JSON only.`
           },
           {
-            role: "user",
-            content: `Question: ${questionText}
+            type: "image_url",
+            image_url: {
+              url: documentUrl
+            }
+          }
+        ]
+      });
+    } else {
+      messages.push({
+        role: "user",
+        content: `Question: ${questionText}
 
 Student's Answer: ${studentAnswer}
 
 Evaluate this answer and respond with JSON only.`
-          }
-        ],
+      });
+    }
+
+    // Use Gemini for evaluation (supports multimodal)
+    const evaluationResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${LOVABLE_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "google/gemini-2.5-flash",
+        messages,
       }),
     });
 
