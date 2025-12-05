@@ -31,7 +31,11 @@ serve(async (req) => {
                       questionText.toLowerCase().includes("diagram") ||
                       questionText.toLowerCase().includes("table");
 
-    // Build messages for AI - use multimodal if we have a document with figures
+    // Check if document is a PDF (Gemini vision API doesn't support PDFs directly)
+    const isPdf = documentUrl?.toLowerCase().endsWith('.pdf');
+    const cannotSeeFigure = hasFigure && isPdf;
+
+    // Build messages for AI
     const messages: any[] = [
       {
         role: "system",
@@ -43,7 +47,7 @@ Your task:
 3. Focus on the approach, method, or first steps
 4. Be encouraging and supportive
 5. If previous hints were given, provide a NEW, more specific hint
-6. If the question references a figure, chart, graph, or table, use that visual information to give relevant hints
+${cannotSeeFigure ? `6. IMPORTANT: This question references a figure/chart/table that you cannot see. Provide general guidance on the problem-solving approach and remind the student to refer to the figure in the original document for specific values or information.` : '6. If the question references a figure, chart, graph, or table, use that visual information to give relevant hints'}
 
 Rules:
 - Keep hints concise (1-3 sentences)
@@ -53,9 +57,9 @@ Rules:
       }
     ];
 
-    // If there's a document with figures, use multimodal approach
-    if (hasFigure && documentUrl) {
-      console.log("Using multimodal hint generation with document:", documentUrl);
+    // Only use multimodal for non-PDF image documents
+    if (hasFigure && documentUrl && !isPdf) {
+      console.log("Using multimodal hint generation with image document:", documentUrl);
       messages.push({
         role: "user",
         content: [
@@ -63,7 +67,7 @@ Rules:
             type: "text",
             text: `Question: ${questionText}
 
-The question may reference a figure, chart, or table from the document. Please look at the attached document to understand the visual context when providing your hint.
+The question may reference a figure, chart, or table from the document. Please look at the attached image to understand the visual context when providing your hint.
 
 Please provide a helpful hint (without giving the answer) to help me approach this problem.`
           },
@@ -76,9 +80,13 @@ Please provide a helpful hint (without giving the answer) to help me approach th
         ]
       });
     } else {
+      console.log(cannotSeeFigure 
+        ? "Using text-only hints (PDF with figures - cannot see visuals)" 
+        : "Using text-only hints");
       messages.push({
         role: "user",
         content: `Question: ${questionText}
+${cannotSeeFigure ? "\nNote: This question references a figure/chart/table from a PDF document that I cannot see. Please provide general guidance on approaching this type of problem and remind me to check the original document for specific visual information." : ""}
 
 Please provide a helpful hint (without giving the answer) to help me approach this problem.`
       });

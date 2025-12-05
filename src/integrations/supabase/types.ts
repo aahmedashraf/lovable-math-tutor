@@ -43,6 +43,7 @@ export type Database = {
           created_at: string
           document_id: string | null
           id: string
+          page_number: number | null
           question_number: string
           question_text: string
           sort_order: number | null
@@ -51,6 +52,7 @@ export type Database = {
           created_at?: string
           document_id?: string | null
           id?: string
+          page_number?: number | null
           question_number: string
           question_text: string
           sort_order?: number | null
@@ -59,6 +61,7 @@ export type Database = {
           created_at?: string
           document_id?: string | null
           id?: string
+          page_number?: number | null
           question_number?: string
           question_text?: string
           sort_order?: number | null

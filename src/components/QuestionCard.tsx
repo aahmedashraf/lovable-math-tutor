@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ChevronRight, CheckCircle, XCircle, Lightbulb, Loader2, Send } from "lucide-react";
+import { ChevronRight, CheckCircle, XCircle, AlertCircle, Lightbulb, Loader2, Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
@@ -34,9 +34,11 @@ export const QuestionCard = ({ question, existingAnswer, onAnswerSubmit, documen
   const [showHints, setShowHints] = useState(false);
   const [currentResult, setCurrentResult] = useState<{
     isCorrect: boolean | null;
+    cannotGrade: boolean;
     feedback: string | null;
   }>({
     isCorrect: existingAnswer?.is_correct ?? null,
+    cannotGrade: false,
     feedback: existingAnswer?.feedback ?? null,
   });
   const { toast } = useToast();
@@ -86,14 +88,23 @@ export const QuestionCard = ({ question, existingAnswer, onAnswerSubmit, documen
 
       setCurrentResult({
         isCorrect: evalData.isCorrect,
+        cannotGrade: evalData.cannotGrade || false,
         feedback: evalData.feedback,
       });
 
-      toast({
-        title: evalData.isCorrect ? "Correct! 🎉" : "Not quite right",
-        description: evalData.feedback,
-        variant: evalData.isCorrect ? "default" : "destructive",
-      });
+      // Show appropriate toast based on result
+      if (evalData.cannotGrade) {
+        toast({
+          title: "Answer submitted",
+          description: "Please check your answer against the figure in the original document.",
+        });
+      } else {
+        toast({
+          title: evalData.isCorrect ? "Correct! 🎉" : "Not quite right",
+          description: evalData.feedback,
+          variant: evalData.isCorrect ? "default" : "destructive",
+        });
+      }
 
       onAnswerSubmit();
     } catch (error) {
@@ -143,7 +154,8 @@ export const QuestionCard = ({ question, existingAnswer, onAnswerSubmit, documen
     }
   };
 
-  const hasSubmitted = currentResult.isCorrect !== null;
+  const hasSubmitted = currentResult.feedback !== null;
+  const showCorrectStatus = hasSubmitted && !currentResult.cannotGrade && currentResult.isCorrect !== null;
 
   return (
     <Card className="overflow-hidden transition-all duration-300 hover:shadow-card-hover">
@@ -154,7 +166,7 @@ export const QuestionCard = ({ question, existingAnswer, onAnswerSubmit, documen
             {question.question_number}
           </span>
           <h3 className="font-medium text-foreground">Question {question.question_number}</h3>
-          {hasSubmitted && (
+          {showCorrectStatus && (
             <span className={`ml-auto flex items-center gap-1 text-sm font-medium ${currentResult.isCorrect ? "text-success" : "text-destructive"}`}>
               {currentResult.isCorrect ? (
                 <>
@@ -167,6 +179,12 @@ export const QuestionCard = ({ question, existingAnswer, onAnswerSubmit, documen
                   Incorrect
                 </>
               )}
+            </span>
+          )}
+          {hasSubmitted && currentResult.cannotGrade && (
+            <span className="ml-auto flex items-center gap-1 text-sm font-medium text-warning">
+              <AlertCircle className="h-4 w-4" />
+              Review Required
             </span>
           )}
         </div>
@@ -217,12 +235,18 @@ export const QuestionCard = ({ question, existingAnswer, onAnswerSubmit, documen
           {/* Feedback Display */}
           {hasSubmitted && currentResult.feedback && (
             <div className={`p-4 rounded-lg animate-slide-up ${
-              currentResult.isCorrect 
-                ? "bg-success/10 border border-success/20" 
-                : "bg-destructive/10 border border-destructive/20"
+              currentResult.cannotGrade 
+                ? "bg-warning/10 border border-warning/20"
+                : currentResult.isCorrect 
+                  ? "bg-success/10 border border-success/20" 
+                  : "bg-destructive/10 border border-destructive/20"
             }`}>
               <p className="text-sm font-medium mb-1">
-                {currentResult.isCorrect ? "Great job!" : "Feedback:"}
+                {currentResult.cannotGrade 
+                  ? "Feedback (please verify against the original document):"
+                  : currentResult.isCorrect 
+                    ? "Great job!" 
+                    : "Feedback:"}
               </p>
               <p className="text-sm text-muted-foreground">{currentResult.feedback}</p>
             </div>
