@@ -32,14 +32,39 @@ serve(async (req) => {
                       questionText.toLowerCase().includes("diagram") ||
                       questionText.toLowerCase().includes("table");
 
-    // Check if document is a PDF (Gemini vision API doesn't support PDFs)
+    // Check if document is a PDF (Gemini vision API doesn't support PDFs directly)
     const isPdf = documentUrl?.toLowerCase().endsWith('.pdf');
+    
+    // For PDF documents with figure-based questions, we cannot grade accurately
+    const cannotGradeAccurately = hasFigure && isPdf;
 
     // Build messages for AI
     const messages: any[] = [
       {
         role: "system",
-        content: `You are an expert math teacher evaluating student answers. 
+        content: cannotGradeAccurately 
+          ? `You are an expert math teacher providing feedback on student answers.
+
+IMPORTANT: This question references a figure/chart/table/graph that you CANNOT see (it's in a PDF document).
+
+Your task:
+1. Review the student's methodology and approach based on what you can understand from the question text
+2. Provide encouraging, helpful feedback WITHOUT marking as right or wrong
+3. Comment on whether the approach/format seems reasonable
+4. Remind the student to verify their answer against the figure in the original document
+
+Rules:
+- Do NOT mark as correct or incorrect since you cannot verify against the figure
+- Be supportive and constructive
+- Focus on the problem-solving approach
+- Keep feedback to 2-3 sentences
+
+Respond in this exact JSON format:
+{
+  "cannotGrade": true,
+  "feedback": "Your feedback here. Remember to tell them to check their answer against the figure in the original document."
+}`
+          : `You are an expert math teacher evaluating student answers. 
 
 Your task:
 1. Determine if the student's answer is CORRECT or INCORRECT
@@ -50,7 +75,6 @@ Rules:
 - If incorrect, give a hint about where they went wrong
 - Do NOT give away the answer
 - Keep feedback to 1-2 sentences max
-${hasFigure && isPdf ? `- This question references a figure/chart/table that you cannot see. Focus on evaluating the methodology and format of the answer. Be slightly more lenient if the answer format is correct but you cannot verify exact values from the figure.` : ''}
 
 Respond in this exact JSON format:
 {
@@ -60,7 +84,7 @@ Respond in this exact JSON format:
       }
     ];
 
-    // Only use multimodal for non-PDF image documents
+    // Only use multimodal for non-PDF image documents that have figures
     if (hasFigure && documentUrl && !isPdf) {
       console.log("Using multimodal evaluation with image document:", documentUrl);
       messages.push({
@@ -85,13 +109,15 @@ Evaluate this answer and respond with JSON only.`
         ]
       });
     } else {
-      console.log("Using text-only evaluation", hasFigure ? "(PDF document - vision not supported)" : "");
+      console.log(cannotGradeAccurately 
+        ? "Using lenient evaluation (PDF with figures - cannot grade accurately)" 
+        : "Using text-only evaluation");
       messages.push({
         role: "user",
         content: `Question: ${questionText}
 
 Student's Answer: ${studentAnswer}
-${hasFigure && isPdf ? "\nNote: This question references a figure/chart/table from a PDF document. Please evaluate the answer based on the question text and common knowledge about such problems." : ""}
+${cannotGradeAccurately ? "\nNote: This question references a figure/chart/table from a PDF document that you cannot see. Provide helpful feedback on their approach without marking right or wrong." : ""}
 
 Evaluate this answer and respond with JSON only.`
       });
@@ -135,7 +161,9 @@ Evaluate this answer and respond with JSON only.`
     console.log("Evaluation response:", responseText);
 
     // Parse the evaluation result
-    let evaluation = { isCorrect: false, feedback: "Unable to evaluate answer." };
+    let evaluation: { isCorrect?: boolean; cannotGrade?: boolean; feedback: string } = { 
+      feedback: "Unable to evaluate answer." 
+    };
     try {
       let cleanedText = responseText.trim();
       if (cleanedText.startsWith("```json")) {
@@ -151,11 +179,14 @@ Evaluate this answer and respond with JSON only.`
       console.error("Failed to parse evaluation:", parseError);
     }
 
+    // Determine the final result
+    const isCorrect = evaluation.cannotGrade ? null : (evaluation.isCorrect ?? false);
+
     // Update the student answer with evaluation results
     const { error: updateError } = await supabase
       .from("student_answers")
       .update({
-        is_correct: evaluation.isCorrect,
+        is_correct: isCorrect,
         feedback: evaluation.feedback,
       })
       .eq("id", answerId);
@@ -165,12 +196,13 @@ Evaluate this answer and respond with JSON only.`
       throw updateError;
     }
 
-    console.log("Answer evaluated successfully");
+    console.log("Answer evaluated successfully", evaluation.cannotGrade ? "(cannot grade - figure reference)" : "");
 
     return new Response(
       JSON.stringify({
         success: true,
-        isCorrect: evaluation.isCorrect,
+        isCorrect: isCorrect,
+        cannotGrade: evaluation.cannotGrade || false,
         feedback: evaluation.feedback,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
