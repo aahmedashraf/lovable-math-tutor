@@ -32,7 +32,10 @@ serve(async (req) => {
                       questionText.toLowerCase().includes("diagram") ||
                       questionText.toLowerCase().includes("table");
 
-    // Build messages for AI - use multimodal if we have a document with figures
+    // Check if document is a PDF (Gemini vision API doesn't support PDFs)
+    const isPdf = documentUrl?.toLowerCase().endsWith('.pdf');
+
+    // Build messages for AI
     const messages: any[] = [
       {
         role: "system",
@@ -47,7 +50,7 @@ Rules:
 - If incorrect, give a hint about where they went wrong
 - Do NOT give away the answer
 - Keep feedback to 1-2 sentences max
-- If the question references a figure, chart, graph, or table, and you can see the document, use that visual information to evaluate the answer
+${hasFigure && isPdf ? `- This question references a figure/chart/table that you cannot see. Focus on evaluating the methodology and format of the answer. Be slightly more lenient if the answer format is correct but you cannot verify exact values from the figure.` : ''}
 
 Respond in this exact JSON format:
 {
@@ -57,9 +60,9 @@ Respond in this exact JSON format:
       }
     ];
 
-    // If there's a document with figures, use multimodal approach
-    if (hasFigure && documentUrl) {
-      console.log("Using multimodal evaluation with document:", documentUrl);
+    // Only use multimodal for non-PDF image documents
+    if (hasFigure && documentUrl && !isPdf) {
+      console.log("Using multimodal evaluation with image document:", documentUrl);
       messages.push({
         role: "user",
         content: [
@@ -69,7 +72,7 @@ Respond in this exact JSON format:
 
 Student's Answer: ${studentAnswer}
 
-The question may reference a figure, chart, or table from the document. Please look at the attached document to understand the visual context when evaluating the answer.
+The question may reference a figure, chart, or table from the document. Please look at the attached image to understand the visual context when evaluating the answer.
 
 Evaluate this answer and respond with JSON only.`
           },
@@ -82,11 +85,13 @@ Evaluate this answer and respond with JSON only.`
         ]
       });
     } else {
+      console.log("Using text-only evaluation", hasFigure ? "(PDF document - vision not supported)" : "");
       messages.push({
         role: "user",
         content: `Question: ${questionText}
 
 Student's Answer: ${studentAnswer}
+${hasFigure && isPdf ? "\nNote: This question references a figure/chart/table from a PDF document. Please evaluate the answer based on the question text and common knowledge about such problems." : ""}
 
 Evaluate this answer and respond with JSON only.`
       });
