@@ -16,7 +16,8 @@ export async function uploadPdf(file: File): Promise<Question[]> {
     throw new Error(error || "Failed to upload PDF");
   }
 
-  return response.json();
+  const data = await response.json();
+  return data.questions || data;
 }
 
 export async function markAnswer(
