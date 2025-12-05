@@ -23,9 +23,10 @@ interface QuestionCardProps {
   question: Question;
   existingAnswer?: StudentAnswer;
   onAnswerSubmit: () => void;
+  documentUrl?: string | null;
 }
 
-export const QuestionCard = ({ question, existingAnswer, onAnswerSubmit }: QuestionCardProps) => {
+export const QuestionCard = ({ question, existingAnswer, onAnswerSubmit, documentUrl }: QuestionCardProps) => {
   const [answer, setAnswer] = useState(existingAnswer?.student_answer || "");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isGettingHint, setIsGettingHint] = useState(false);
@@ -64,7 +65,7 @@ export const QuestionCard = ({ question, existingAnswer, onAnswerSubmit }: Quest
 
       if (answerError) throw answerError;
 
-      // Call evaluation function
+      // Call evaluation function with documentUrl for multimodal evaluation
       const { data: evalData, error: evalError } = await supabase.functions.invoke(
         "evaluate-answer",
         {
@@ -73,6 +74,7 @@ export const QuestionCard = ({ question, existingAnswer, onAnswerSubmit }: Quest
             questionText: question.question_text,
             studentAnswer: answer.trim(),
             answerId: answerData.id,
+            documentUrl: documentUrl,
           },
         }
       );
@@ -113,6 +115,7 @@ export const QuestionCard = ({ question, existingAnswer, onAnswerSubmit }: Quest
         body: {
           questionText: question.question_text,
           previousHints: hints,
+          documentUrl: documentUrl,
         },
       });
 

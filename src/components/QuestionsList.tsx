@@ -1,9 +1,8 @@
 import { useState, useEffect } from "react";
-import { FileQuestion, Loader2, ArrowLeft, RefreshCw, Image, X } from "lucide-react";
+import { FileQuestion, Loader2, ArrowLeft, RefreshCw, PanelLeftClose, PanelLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { QuestionCard } from "@/components/QuestionCard";
 import { supabase } from "@/integrations/supabase/client";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 interface Question {
   id: string;
@@ -29,7 +28,7 @@ export const QuestionsList = ({ onBack }: QuestionsListProps) => {
   const [selectedDocumentId, setSelectedDocumentId] = useState<string | null>(null);
   const [questions, setQuestions] = useState<Question[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [showDocumentViewer, setShowDocumentViewer] = useState(false);
+  const [showPdfViewer, setShowPdfViewer] = useState(true);
 
   const fetchDocuments = async () => {
     setIsLoading(true);
@@ -114,8 +113,10 @@ export const QuestionsList = ({ onBack }: QuestionsListProps) => {
     );
   }
 
+  const hasFileUrl = !!selectedDocument?.file_url;
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {/* Document Selector */}
       <div className="flex flex-col sm:flex-row sm:items-center gap-4">
         <Button variant="ghost" onClick={onBack} className="w-fit">
@@ -139,10 +140,23 @@ export const QuestionsList = ({ onBack }: QuestionsListProps) => {
         </div>
 
         <div className="flex gap-2">
-          {selectedDocument?.file_url && (
-            <Button variant="outline" onClick={() => setShowDocumentViewer(true)}>
-              <Image className="h-4 w-4" />
-              View Original
+          {hasFileUrl && (
+            <Button 
+              variant="outline" 
+              onClick={() => setShowPdfViewer(!showPdfViewer)}
+              title={showPdfViewer ? "Hide document" : "Show document"}
+            >
+              {showPdfViewer ? (
+                <>
+                  <PanelLeftClose className="h-4 w-4" />
+                  <span className="hidden sm:inline">Hide PDF</span>
+                </>
+              ) : (
+                <>
+                  <PanelLeft className="h-4 w-4" />
+                  <span className="hidden sm:inline">Show PDF</span>
+                </>
+              )}
             </Button>
           )}
           <Button variant="outline" size="icon" onClick={fetchDocuments}>
@@ -151,56 +165,62 @@ export const QuestionsList = ({ onBack }: QuestionsListProps) => {
         </div>
       </div>
 
-      {/* Questions Summary */}
-      <div className="bg-secondary/50 rounded-xl p-4 flex items-center justify-between">
-        <p className="text-sm text-muted-foreground">
-          <span className="font-semibold text-foreground">{questions.length}</span> question{questions.length !== 1 ? "s" : ""} extracted from this document
-        </p>
-        {selectedDocument?.file_url && (
-          <p className="text-xs text-muted-foreground">
-            Click "View Original" to see figures, tables, and diagrams
-          </p>
-        )}
-      </div>
-
-      {/* Questions List */}
-      <div className="space-y-6">
-        {questions.map((question) => (
-          <QuestionCard
-            key={question.id}
-            question={question}
-            onAnswerSubmit={handleAnswerSubmit}
-          />
-        ))}
-      </div>
-
-      {/* Document Viewer Dialog */}
-      <Dialog open={showDocumentViewer} onOpenChange={setShowDocumentViewer}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
-          <DialogHeader>
-            <DialogTitle className="flex items-center justify-between">
-              <span>{selectedDocument?.filename}</span>
-            </DialogTitle>
-          </DialogHeader>
-          <div className="flex-1 overflow-auto bg-muted/30 rounded-lg p-2">
-            {selectedDocument?.file_url && (
-              selectedDocument.file_url.toLowerCase().endsWith('.pdf') ? (
-                <iframe
-                  src={selectedDocument.file_url}
-                  className="w-full h-[70vh] rounded-lg"
-                  title="Original Document"
-                />
-              ) : (
+      {/* Split View Container */}
+      <div className="flex gap-4 h-[calc(100vh-180px)]">
+        {/* PDF Viewer - Left Side */}
+        {hasFileUrl && showPdfViewer && (
+          <div className="w-1/2 flex-shrink-0 border rounded-xl overflow-hidden bg-muted/30 flex flex-col">
+            <div className="bg-secondary/50 px-4 py-3 border-b">
+              <h3 className="font-medium text-sm text-foreground truncate">
+                {selectedDocument?.filename}
+              </h3>
+              <p className="text-xs text-muted-foreground mt-1">
+                Refer to this document for figures, tables, and diagrams
+              </p>
+            </div>
+            {selectedDocument.file_url?.toLowerCase().endsWith('.pdf') ? (
+              <iframe
+                src={selectedDocument.file_url}
+                className="flex-1 w-full"
+                title="Original Document"
+              />
+            ) : (
+              <div className="flex-1 overflow-auto p-4">
                 <img
-                  src={selectedDocument.file_url}
+                  src={selectedDocument.file_url!}
                   alt="Original Document"
                   className="w-full h-auto rounded-lg"
                 />
-              )
+              </div>
             )}
           </div>
-        </DialogContent>
-      </Dialog>
+        )}
+
+        {/* Questions - Right Side */}
+        <div className={`${hasFileUrl && showPdfViewer ? 'w-1/2' : 'w-full'} overflow-y-auto space-y-4 pr-2`}>
+          {/* Questions Summary */}
+          <div className="bg-secondary/50 rounded-xl p-4 flex items-center justify-between sticky top-0 z-10">
+            <p className="text-sm text-muted-foreground">
+              <span className="font-semibold text-foreground">{questions.length}</span> question{questions.length !== 1 ? "s" : ""} extracted
+            </p>
+            {!showPdfViewer && hasFileUrl && (
+              <p className="text-xs text-muted-foreground">
+                Click "Show PDF" to see figures and diagrams
+              </p>
+            )}
+          </div>
+
+          {/* Questions List */}
+          {questions.map((question) => (
+            <QuestionCard
+              key={question.id}
+              question={question}
+              onAnswerSubmit={handleAnswerSubmit}
+              documentUrl={selectedDocument?.file_url}
+            />
+          ))}
+        </div>
+      </div>
     </div>
   );
 };
