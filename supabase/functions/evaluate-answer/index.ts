@@ -12,7 +12,7 @@ serve(async (req) => {
   }
 
   try {
-    const { questionId, questionText, studentAnswer, answerId, documentUrl, pageImageBase64 } = await req.json();
+    const { questionId, questionText, studentAnswer, answerId, documentUrl } = await req.json();
     console.log(`Evaluating answer for question: ${questionId}`);
 
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
@@ -32,44 +32,10 @@ serve(async (req) => {
                       questionText.toLowerCase().includes("diagram") ||
                       questionText.toLowerCase().includes("table");
 
-    // Check if document is a PDF (Gemini vision API doesn't support PDFs directly)
+    // Check if document is a PDF (Gemini vision API doesn't support PDFs)
     const isPdf = documentUrl?.toLowerCase().endsWith('.pdf');
-    
-    // Determine if we can do visual evaluation
-    const hasVisualContext = pageImageBase64 || (documentUrl && !isPdf);
-    const needsManualReview = hasFigure && !hasVisualContext;
 
-    console.log(`Question analysis: hasFigure=${hasFigure}, isPdf=${isPdf}, hasVisualContext=${hasVisualContext}, needsManualReview=${needsManualReview}`);
-
-    // If question has figure but no visual context, return needs review status
-    if (needsManualReview) {
-      console.log("Figure-based question without visual context - returning needs review status");
-      
-      const { error: updateError } = await supabase
-        .from("student_answers")
-        .update({
-          is_correct: null,
-          feedback: "This question references a figure, table, or chart from the original document. Please refer to the document viewer on the left to see the visual content. Your answer has been recorded for review.",
-        })
-        .eq("id", answerId);
-
-      if (updateError) {
-        console.error("Error updating answer:", updateError);
-        throw updateError;
-      }
-
-      return new Response(
-        JSON.stringify({
-          success: true,
-          needsReview: true,
-          isCorrect: null,
-          feedback: "This question references a figure, table, or chart from the original document. Please refer to the document viewer on the left to see the visual content. Your answer has been recorded for review.",
-        }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    // Build messages for AI evaluation
+    // Build messages for AI
     const messages: any[] = [
       {
         role: "system",
@@ -84,6 +50,7 @@ Rules:
 - If incorrect, give a hint about where they went wrong
 - Do NOT give away the answer
 - Keep feedback to 1-2 sentences max
+${hasFigure && isPdf ? `- This question references a figure/chart/table that you cannot see. Focus on evaluating the methodology and format of the answer. Be slightly more lenient if the answer format is correct but you cannot verify exact values from the figure.` : ''}
 
 Respond in this exact JSON format:
 {
@@ -93,13 +60,9 @@ Respond in this exact JSON format:
       }
     ];
 
-    // Use multimodal evaluation if we have visual context
-    if (hasVisualContext) {
-      const imageUrl = pageImageBase64 
-        ? `data:image/png;base64,${pageImageBase64}` 
-        : documentUrl;
-      
-      console.log("Using multimodal evaluation with image");
+    // Only use multimodal for non-PDF image documents
+    if (hasFigure && documentUrl && !isPdf) {
+      console.log("Using multimodal evaluation with image document:", documentUrl);
       messages.push({
         role: "user",
         content: [
@@ -116,24 +79,25 @@ Evaluate this answer and respond with JSON only.`
           {
             type: "image_url",
             image_url: {
-              url: imageUrl
+              url: documentUrl
             }
           }
         ]
       });
     } else {
-      console.log("Using text-only evaluation");
+      console.log("Using text-only evaluation", hasFigure ? "(PDF document - vision not supported)" : "");
       messages.push({
         role: "user",
         content: `Question: ${questionText}
 
 Student's Answer: ${studentAnswer}
+${hasFigure && isPdf ? "\nNote: This question references a figure/chart/table from a PDF document. Please evaluate the answer based on the question text and common knowledge about such problems." : ""}
 
 Evaluate this answer and respond with JSON only.`
       });
     }
 
-    // Use Gemini for evaluation
+    // Use Gemini for evaluation (supports multimodal)
     const evaluationResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -206,7 +170,6 @@ Evaluate this answer and respond with JSON only.`
     return new Response(
       JSON.stringify({
         success: true,
-        needsReview: false,
         isCorrect: evaluation.isCorrect,
         feedback: evaluation.feedback,
       }),

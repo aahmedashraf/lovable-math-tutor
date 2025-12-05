@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ChevronRight, CheckCircle, XCircle, Lightbulb, Loader2, Send, AlertCircle } from "lucide-react";
+import { ChevronRight, CheckCircle, XCircle, Lightbulb, Loader2, Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
@@ -35,11 +35,9 @@ export const QuestionCard = ({ question, existingAnswer, onAnswerSubmit, documen
   const [currentResult, setCurrentResult] = useState<{
     isCorrect: boolean | null;
     feedback: string | null;
-    needsReview?: boolean;
   }>({
     isCorrect: existingAnswer?.is_correct ?? null,
     feedback: existingAnswer?.feedback ?? null,
-    needsReview: false,
   });
   const { toast } = useToast();
 
@@ -55,6 +53,7 @@ export const QuestionCard = ({ question, existingAnswer, onAnswerSubmit, documen
 
     setIsSubmitting(true);
     try {
+      // Insert the student answer
       const { data: answerData, error: answerError } = await supabase
         .from("student_answers")
         .insert({
@@ -66,6 +65,7 @@ export const QuestionCard = ({ question, existingAnswer, onAnswerSubmit, documen
 
       if (answerError) throw answerError;
 
+      // Call evaluation function with documentUrl for multimodal evaluation
       const { data: evalData, error: evalError } = await supabase.functions.invoke(
         "evaluate-answer",
         {
@@ -87,21 +87,13 @@ export const QuestionCard = ({ question, existingAnswer, onAnswerSubmit, documen
       setCurrentResult({
         isCorrect: evalData.isCorrect,
         feedback: evalData.feedback,
-        needsReview: evalData.needsReview || false,
       });
 
-      if (evalData.needsReview) {
-        toast({
-          title: "Answer recorded",
-          description: "This question requires the figure/table for evaluation. Please check the document viewer.",
-        });
-      } else {
-        toast({
-          title: evalData.isCorrect ? "Correct! 🎉" : "Not quite right",
-          description: evalData.feedback,
-          variant: evalData.isCorrect ? "default" : "destructive",
-        });
-      }
+      toast({
+        title: evalData.isCorrect ? "Correct! 🎉" : "Not quite right",
+        description: evalData.feedback,
+        variant: evalData.isCorrect ? "default" : "destructive",
+      });
 
       onAnswerSubmit();
     } catch (error) {
@@ -151,7 +143,7 @@ export const QuestionCard = ({ question, existingAnswer, onAnswerSubmit, documen
     }
   };
 
-  const hasSubmitted = currentResult.isCorrect !== null || currentResult.needsReview;
+  const hasSubmitted = currentResult.isCorrect !== null;
 
   return (
     <Card className="overflow-hidden transition-all duration-300 hover:shadow-card-hover">
@@ -163,19 +155,8 @@ export const QuestionCard = ({ question, existingAnswer, onAnswerSubmit, documen
           </span>
           <h3 className="font-medium text-foreground">Question {question.question_number}</h3>
           {hasSubmitted && (
-            <span className={`ml-auto flex items-center gap-1 text-sm font-medium ${
-              currentResult.needsReview 
-                ? "text-warning" 
-                : currentResult.isCorrect 
-                  ? "text-success" 
-                  : "text-destructive"
-            }`}>
-              {currentResult.needsReview ? (
-                <>
-                  <AlertCircle className="h-4 w-4" />
-                  Needs Review
-                </>
-              ) : currentResult.isCorrect ? (
+            <span className={`ml-auto flex items-center gap-1 text-sm font-medium ${currentResult.isCorrect ? "text-success" : "text-destructive"}`}>
+              {currentResult.isCorrect ? (
                 <>
                   <CheckCircle className="h-4 w-4" />
                   Correct
@@ -236,18 +217,12 @@ export const QuestionCard = ({ question, existingAnswer, onAnswerSubmit, documen
           {/* Feedback Display */}
           {hasSubmitted && currentResult.feedback && (
             <div className={`p-4 rounded-lg animate-slide-up ${
-              currentResult.needsReview
-                ? "bg-warning/10 border border-warning/20"
-                : currentResult.isCorrect 
-                  ? "bg-success/10 border border-success/20" 
-                  : "bg-destructive/10 border border-destructive/20"
+              currentResult.isCorrect 
+                ? "bg-success/10 border border-success/20" 
+                : "bg-destructive/10 border border-destructive/20"
             }`}>
               <p className="text-sm font-medium mb-1">
-                {currentResult.needsReview 
-                  ? "Manual Review Required" 
-                  : currentResult.isCorrect 
-                    ? "Great job!" 
-                    : "Feedback:"}
+                {currentResult.isCorrect ? "Great job!" : "Feedback:"}
               </p>
               <p className="text-sm text-muted-foreground">{currentResult.feedback}</p>
             </div>
