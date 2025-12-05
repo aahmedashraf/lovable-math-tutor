@@ -170,13 +170,22 @@ export const QuestionsList = ({ onBack }: QuestionsListProps) => {
         {/* PDF Viewer - Left Side */}
         {hasFileUrl && showPdfViewer && (
           <div className="w-1/2 flex-shrink-0 border rounded-xl overflow-hidden bg-muted/30 flex flex-col">
-            <div className="bg-secondary/50 px-4 py-3 border-b">
-              <h3 className="font-medium text-sm text-foreground truncate">
-                {selectedDocument?.filename}
-              </h3>
-              <p className="text-xs text-muted-foreground mt-1">
-                Refer to this document for figures, tables, and diagrams
-              </p>
+            <div className="bg-secondary/50 px-4 py-3 border-b flex items-center justify-between">
+              <div>
+                <h3 className="font-medium text-sm text-foreground truncate">
+                  {selectedDocument?.filename}
+                </h3>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Refer to this document for figures, tables, and diagrams
+                </p>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => window.open(selectedDocument.file_url!, '_blank')}
+              >
+                Open in New Tab
+              </Button>
             </div>
             {selectedDocument.file_url?.toLowerCase().endsWith('.pdf') ? (
               <iframe
