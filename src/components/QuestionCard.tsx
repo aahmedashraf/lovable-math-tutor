@@ -104,7 +104,7 @@ export const QuestionCard = ({ question, questionIndex, onAnswerSubmit }: Questi
         {/* Diagrams Section */}
         {question.diagrams && question.diagrams.length > 0 && (
           <div className="mb-6 space-y-4">
-            <p className="text-sm font-medium text-muted-foreground">Figures/Diagrams:</p>
+            <p className="text-sm font-medium text-muted-foreground">Figures for this Question</p>
             <div className="grid gap-4 sm:grid-cols-2">
               {question.diagrams.map((diagram, index) => {
                 if (!diagram?.image_base64) return null;
@@ -115,7 +115,7 @@ export const QuestionCard = ({ question, questionIndex, onAnswerSubmit }: Questi
                   >
                     <img
                       src={`data:image/png;base64,${diagram.image_base64}`}
-                      alt={`Diagram ${index + 1} for question ${questionNumber}`}
+                      alt="Figure"
                       className="w-full h-auto rounded"
                     />
                   </div>
