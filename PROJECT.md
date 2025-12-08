@@ -96,8 +96,8 @@ This application enables educators and students to:
 
 ```bash
 # Clone the repository
-git clone <YOUR_GIT_URL>
-cd <YOUR_PROJECT_NAME>
+git clone https://github.com/aahmedashraf/lovable-math-tutor
+cd lovable-math-tutor
 
 # Install dependencies
 npm install
@@ -292,11 +292,3 @@ Generates a guided hint for a question.
 
 ---
 
-## Future Enhancements
-
-- [ ] Page navigation in PDF viewer
-- [ ] Student authentication
-- [ ] Progress tracking dashboard
-- [ ] Export results to CSV
-- [ ] Question categorization by topic
-- [ ] Difficulty level tagging
