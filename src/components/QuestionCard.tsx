@@ -5,7 +5,7 @@ import { Card } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-
+import { useAuth } from "@/hooks/useAuth";
 interface Question {
   id: string;
   question_number: string;
@@ -42,6 +42,7 @@ export const QuestionCard = ({ question, existingAnswer, onAnswerSubmit, documen
     feedback: existingAnswer?.feedback ?? null,
   });
   const { toast } = useToast();
+  const { user } = useAuth();
 
   const handleSubmit = async () => {
     if (!answer.trim()) {
@@ -55,12 +56,13 @@ export const QuestionCard = ({ question, existingAnswer, onAnswerSubmit, documen
 
     setIsSubmitting(true);
     try {
-      // Insert the student answer
+      // Insert the student answer with user_id
       const { data: answerData, error: answerError } = await supabase
         .from("student_answers")
         .insert({
           question_id: question.id,
           student_answer: answer.trim(),
+          user_id: user?.id,
         })
         .select()
         .single();

@@ -21,6 +21,7 @@ export type Database = {
           id: string
           status: string
           uploaded_at: string
+          user_id: string | null
         }
         Insert: {
           file_url?: string | null
@@ -28,6 +29,7 @@ export type Database = {
           id?: string
           status?: string
           uploaded_at?: string
+          user_id?: string | null
         }
         Update: {
           file_url?: string | null
@@ -35,6 +37,25 @@ export type Database = {
           id?: string
           status?: string
           uploaded_at?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          created_at: string
+          email: string | null
+          id: string
+        }
+        Insert: {
+          created_at?: string
+          email?: string | null
+          id: string
+        }
+        Update: {
+          created_at?: string
+          email?: string | null
+          id?: string
         }
         Relationships: []
       }
@@ -84,6 +105,7 @@ export type Database = {
           question_id: string
           student_answer: string
           submitted_at: string
+          user_id: string | null
         }
         Insert: {
           feedback?: string | null
@@ -92,6 +114,7 @@ export type Database = {
           question_id: string
           student_answer: string
           submitted_at?: string
+          user_id?: string | null
         }
         Update: {
           feedback?: string | null
@@ -100,6 +123,7 @@ export type Database = {
           question_id?: string
           student_answer?: string
           submitted_at?: string
+          user_id?: string | null
         }
         Relationships: [
           {

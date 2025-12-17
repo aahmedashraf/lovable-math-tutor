@@ -1,13 +1,40 @@
-import { useState } from "react";
-import { BookOpen, Upload, FileQuestion, Brain, Lightbulb, CheckCircle } from "lucide-react";
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import { BookOpen, Upload, FileQuestion, Brain, Lightbulb, CheckCircle, LogOut, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DocumentUpload } from "@/components/DocumentUpload";
 import { QuestionsList } from "@/components/QuestionsList";
+import { useAuth } from "@/hooks/useAuth";
 
 type View = "home" | "upload" | "questions";
 
 const Index = () => {
   const [currentView, setCurrentView] = useState<View>("home");
+  const { user, loading, signOut } = useAuth();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (!loading && !user) {
+      navigate("/auth");
+    }
+  }, [user, loading, navigate]);
+
+  const handleSignOut = async () => {
+    await signOut();
+    navigate("/auth");
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (!user) {
+    return null;
+  }
 
   const features = [
     {
@@ -94,6 +121,19 @@ const Index = () => {
   // Home View
   return (
     <main className="min-h-screen bg-background">
+      {/* User Bar */}
+      <div className="border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+        <div className="container max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
+          <span className="text-sm text-muted-foreground">
+            Signed in as <span className="font-medium text-foreground">{user.email}</span>
+          </span>
+          <Button variant="ghost" size="sm" onClick={handleSignOut}>
+            <LogOut className="h-4 w-4" />
+            Sign Out
+          </Button>
+        </div>
+      </div>
+
       {/* Hero Section */}
       <section className="relative overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-accent/5" />

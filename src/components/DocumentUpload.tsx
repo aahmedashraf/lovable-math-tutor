@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-
+import { useAuth } from "@/hooks/useAuth";
 interface DocumentUploadProps {
   onUploadComplete: () => void;
 }
@@ -15,6 +15,7 @@ export const DocumentUpload = ({ onUploadComplete }: DocumentUploadProps) => {
   const [uploadStatus, setUploadStatus] = useState<"idle" | "uploading" | "processing" | "complete" | "error">("idle");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const { toast } = useToast();
+  const { user } = useAuth();
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -69,10 +70,10 @@ export const DocumentUpload = ({ onUploadComplete }: DocumentUploadProps) => {
     setIsUploading(true);
 
     try {
-      // Create document record
+      // Create document record with user_id
       const { data: docData, error: docError } = await supabase
         .from("documents")
-        .insert({ filename: file.name, status: "processing" })
+        .insert({ filename: file.name, status: "processing", user_id: user?.id })
         .select()
         .single();
 
